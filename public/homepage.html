@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" type="text/css" href="style.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.js" integrity="sha512-9mpsATI0KClwt+xVZfbcf2lJ8IFBAwsubJ6mI3rtULwyM3fBmQFzj0It4tGqxLOGQwGfJdk/G+fANnxfq9/cew==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="client.js"></script>
+</head>
+<body>
+    
+    <!-- <canvas id="canvas" width="500" height="400"></canvas> -->
+    
+    <br>
+    <h1>Dealer's wallet:</h1>
+    <h1>Player1 wallet:</h1>
+    <h1>Player2 wallet:</h1>
+    <canvas class="canvas" id="canvas"></canvas>
+
+    <div class="buttons">
+        <h1 id="handValue">0</h1>
+        <br>
+        <button id="hit" onclick="hit()">Hit</button>
+        <button id="stand" onclick="stand()">Stand</button>
+        <button id="double" onclick="double()">Double</button>
+        <button id="split" onclick="split()">Split</button>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const socket = io();
+        var hand = [];
+        const handValue = document.getElementById('handValue');
+        const hitBtn = document.getElementById('hit');
+        var xoffset = -20;
+        socket.on('connect', () => {
+            console.log('connected');
+        })
+        socket.on('receiveCard', async(data) => {
+            var id = data.playerID;
+            var number = data.number;
+            var sign = data.sign;
+            //console.log(data);
+            hand.push(number);
+            let img;
+            const promise = new Promise(resolve => {
+                img = new Image();
+                img.src='/cards/'+number+'-'+sign+'.png';
+                img.onload = resolve;
+            });
+            await promise;
+            ctx.drawImage(img, xoffset+=20, 0, 125, 181);
+            var value = 0;
+            var hasA = false;
+            hand.forEach(element => {
+                if(element == 'A') {
+                    value+=1;
+                    hasA = true;
+                }
+                else if(element == 'K' || element == 'Q' || element == 'J') value += 10;
+                else value += parseInt(element);
+            });
+            if(hasA) {
+                if(value+10 <= 21) {
+                    handValue.innerHTML = String(value) + '/' + String(value+10);
+                }
+                else {
+                    handValue.innerHTML = value;
+                }
+            }
+            else {
+                handValue.innerHTML = value;
+            }
+            console.log(value);
+        })
+        function hit() {
+            socket.emit('hit');
+        }
+        function stand() {
+            socket.emit('stand');
+        }
+        function double() {
+            socket.emit('double');
+        }
+        function split() {
+            socket.emit('split');
+        }
+        socket.on('playerWin', () => {
+            //setTimeout(resetRound(), 1000);
+            alert('you won');
+            resetRound();
+        })
+        socket.on('playerLose', () => {
+            Promise.all(Array.from(document.images).filter(img => !img.complete).map(img => new Promise(resolve => { img.onload = img.onerror = resolve; }))).then(() => {
+                alert('you lost');
+                resetRound();
+            });
+            //setTimeout(resetRound(), 1000);
+            
+        })
+        socket.on('playerPush', () => {
+            //setTimeout(resetRound(), 1000);
+            alert('dealer pushes');
+            resetRound();
+        })
+        socket.on('dealerCard', (data) => {
+            console.log(data);
+        })
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        function resetRound() {
+            clearCanvas();
+            handValue.innerHTML = '0';
+            hand = [];
+            xoffset = -80;
+        }
+    </script>
+</body>
+</html>
